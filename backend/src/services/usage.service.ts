@@ -31,11 +31,16 @@ export class UsageService {
     };
     let approvalStatus = normalized.approvalStatus ?? UsageStatus.Approved;
     let dangerous = false;
+    let dangerousReagentId: string | undefined;
+    let dangerousHazardLevel: HazardLevel | undefined;
     if (normalized.itemType === ItemType.Reagent) {
       const reagent = await this.reagents.findOne(String(normalized.itemId));
       dangerous = [HazardLevel.Toxic, HazardLevel.Explosive].includes(reagent.hazardLevel);
+      if (dangerous) {
+        dangerousReagentId = reagent.id;
+        dangerousHazardLevel = reagent.hazardLevel;
+      }
       if (dangerous && user.role === Role.Student) approvalStatus = UsageStatus.Pending;
-      if (dangerous) await this.audit.record(user, 'DANGEROUS_REAGENT_USAGE_REQUEST', 'usageRecord', { itemId: reagent.id, hazardLevel: reagent.hazardLevel });
     }
     if (approvalStatus === UsageStatus.Approved) {
       return this.dataSource.transaction(async (em) => {
@@ -46,10 +51,12 @@ export class UsageService {
         } else {
           await this.consumables.adjustStock(String(normalized.itemId), -Number(normalized.quantity), user, 'USE_CONSUMABLE', reason, record.id, em);
         }
+        if (dangerous) await this.audit.record(user, 'DANGEROUS_REAGENT_USAGE_REQUEST', 'usageRecord', { itemId: dangerousReagentId, hazardLevel: dangerousHazardLevel }, em);
         await this.audit.record(user, 'CREATE_USAGE', 'usageRecord', { id: record.id, approvalStatus }, em);
         return record;
       });
     }
+    if (dangerous) await this.audit.record(user, 'DANGEROUS_REAGENT_USAGE_REQUEST', 'usageRecord', { itemId: dangerousReagentId, hazardLevel: dangerousHazardLevel });
     const record = await this.repo.save(this.repo.create({ ...normalized, userId: normalized.userId ?? user.id, approvalStatus }));
     await this.audit.record(user, 'CREATE_USAGE', 'usageRecord', { id: record.id, approvalStatus });
     return record;
