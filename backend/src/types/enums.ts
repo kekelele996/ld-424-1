@@ -48,6 +48,13 @@ export enum ConsumableCategory {
   Other = 'Other',
 }
 
+export enum InventoryChangeType {
+  StockIn = 'StockIn',
+  Usage = 'Usage',
+  UsageApproval = 'UsageApproval',
+  InventoryCheckAdjust = 'InventoryCheckAdjust',
+}
+
 export enum InventoryCheckStatus {
   InProgress = 'InProgress',
   Completed = 'Completed',

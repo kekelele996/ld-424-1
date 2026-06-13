@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { databaseConfig } from './config/database.config';
 import { ConsumableRoutesModule } from './routes/consumable.routes';
 import { InventoryCheckRoutesModule } from './routes/inventoryCheck.routes';
+import { InventoryLogRoutesModule } from './routes/inventoryLog.routes';
 import { ReagentRoutesModule } from './routes/reagent.routes';
 import { StockInRoutesModule } from './routes/stockIn.routes';
 import { UsageRoutesModule } from './routes/usage.routes';
@@ -23,6 +24,7 @@ import { ValidationMiddleware } from './middlewares/validation.middleware';
     StockInRoutesModule,
     UsageRoutesModule,
     InventoryCheckRoutesModule,
+    InventoryLogRoutesModule,
   ],
 })
 export class AppModule implements NestModule {

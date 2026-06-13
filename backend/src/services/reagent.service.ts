@@ -5,6 +5,8 @@ import { Reagent } from '../models/reagent.entity';
 import { AuthUser } from '../types/interfaces';
 import { AuditService } from './audit.service';
 import { AlertService } from './alert.service';
+import { InventoryLogService } from './inventoryLog.service';
+import { InventoryChangeType, ItemType } from '../types/enums';
 
 @Injectable()
 export class ReagentService {
@@ -12,7 +14,8 @@ export class ReagentService {
     @InjectRepository(Reagent) private readonly repo: Repository<Reagent>,
     private readonly audit: AuditService,
     private readonly alerts: AlertService,
-  ) {}
+    private readonly inventoryLogs: InventoryLogService,
+  ) { }
 
   list() {
     return this.repo.find({ order: { name: 'ASC' } });
@@ -40,12 +43,33 @@ export class ReagentService {
     return reagent;
   }
 
-  async adjustStock(id: string, delta: number, user: AuthUser, action = 'ADJUST_REAGENT_STOCK') {
+  async adjustStock(id: string, delta: number, user: AuthUser, action = 'ADJUST_REAGENT_STOCK', reason?: string, relatedRecordId?: string) {
     const reagent = await this.findOne(id);
-    reagent.currentStock = Number(reagent.currentStock) + delta;
+    const beforeStock = Number(reagent.currentStock);
+    reagent.currentStock = beforeStock + delta;
     const saved = await this.repo.save(reagent);
     await this.audit.record(user, action, 'reagent', { id, delta, currentStock: saved.currentStock });
     await this.alerts.cacheLowStockAlert(saved, 'reagent');
+    const changeType = this.resolveChangeType(action);
+    await this.inventoryLogs.record({
+      itemId: id,
+      itemType: ItemType.Reagent,
+      changeType,
+      quantity: Math.abs(delta),
+      beforeStock,
+      afterStock: Number(saved.currentStock),
+      reason: reason ?? action,
+      operatorId: user.id,
+      relatedRecordId,
+    });
     return saved;
+  }
+
+  private resolveChangeType(action: string): InventoryChangeType {
+    if (action.startsWith('STOCK_IN')) return InventoryChangeType.StockIn;
+    if (action.startsWith('APPROVE')) return InventoryChangeType.UsageApproval;
+    if (action.startsWith('USE')) return InventoryChangeType.Usage;
+    if (action.startsWith('INVENTORY_CHECK')) return InventoryChangeType.InventoryCheckAdjust;
+    return InventoryChangeType.StockIn;
   }
 }
