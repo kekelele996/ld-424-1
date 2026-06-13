@@ -31,7 +31,7 @@ export class StockInService {
       } else {
         await this.consumables.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_CONSUMABLE', reason, record.id, em);
       }
-      await this.audit.record(user, 'CREATE_STOCK_IN', 'stockInRecord', { id: record.id, itemType: record.itemType });
+      await this.audit.record(user, 'CREATE_STOCK_IN', 'stockInRecord', { id: record.id, itemType: record.itemType }, em);
       return record;
     });
   }

@@ -43,7 +43,7 @@ export class InventoryCheckService {
           }
         }
       }
-      await this.audit.record(user, 'CREATE_INVENTORY_CHECK', 'inventoryCheck', { id: saved.id, status: saved.status });
+      await this.audit.record(user, 'CREATE_INVENTORY_CHECK', 'inventoryCheck', { id: saved.id, status: saved.status }, em);
       return saved;
     });
   }

@@ -46,7 +46,7 @@ export class UsageService {
         } else {
           await this.consumables.adjustStock(String(normalized.itemId), -Number(normalized.quantity), user, 'USE_CONSUMABLE', reason, record.id, em);
         }
-        await this.audit.record(user, 'CREATE_USAGE', 'usageRecord', { id: record.id, approvalStatus });
+        await this.audit.record(user, 'CREATE_USAGE', 'usageRecord', { id: record.id, approvalStatus }, em);
         return record;
       });
     }
@@ -71,7 +71,7 @@ export class UsageService {
       } else {
         await this.consumables.adjustStock(saved.itemId, -Number(saved.quantity), user, 'APPROVE_CONSUMABLE_USAGE', reason, saved.id, em);
       }
-      await this.audit.record(user, 'APPROVE_USAGE', 'usageRecord', { id });
+      await this.audit.record(user, 'APPROVE_USAGE', 'usageRecord', { id }, em);
       return saved;
     });
   }

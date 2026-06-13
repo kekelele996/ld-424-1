@@ -50,7 +50,7 @@ export class ReagentService {
     const beforeStock = Number(reagent.currentStock);
     reagent.currentStock = beforeStock + delta;
     const saved = await repo.save(reagent);
-    await this.audit.record(user, action, 'reagent', { id, delta, currentStock: saved.currentStock });
+    await this.audit.record(user, action, 'reagent', { id, delta, currentStock: saved.currentStock }, em);
     await this.alerts.cacheLowStockAlert(saved, 'reagent');
     const changeType = this.resolveChangeType(action);
     await this.inventoryLogs.record({

@@ -41,7 +41,7 @@ export class ConsumableService {
     const beforeStock = Number(consumable.currentStock);
     consumable.currentStock = beforeStock + delta;
     const saved = await repo.save(consumable);
-    await this.audit.record(user, action, 'consumable', { id, delta, currentStock: saved.currentStock });
+    await this.audit.record(user, action, 'consumable', { id, delta, currentStock: saved.currentStock }, em);
     await this.alerts.cacheLowStockAlert(saved, 'consumable');
     const changeType = this.resolveChangeType(action);
     await this.inventoryLogs.record({
