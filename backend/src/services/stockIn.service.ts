@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { StockInRecord } from '../models/stockInRecord.entity';
 import { ItemType } from '../types/enums';
 import { AuthUser } from '../types/interfaces';
@@ -12,6 +12,7 @@ import { ReagentService } from './reagent.service';
 export class StockInService {
   constructor(
     @InjectRepository(StockInRecord) private readonly repo: Repository<StockInRecord>,
+    private readonly dataSource: DataSource,
     private readonly reagents: ReagentService,
     private readonly consumables: ConsumableService,
     private readonly audit: AuditService,
@@ -22,14 +23,16 @@ export class StockInService {
   }
 
   async create(payload: Partial<StockInRecord>, user: AuthUser) {
-    const record = await this.repo.save(this.repo.create(payload));
-    const reason = `入库：采购单${record.purchaseOrderNo}，批号${record.batchNumber}`;
-    if (record.itemType === ItemType.Reagent) {
-      await this.reagents.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_REAGENT', reason, record.id);
-    } else {
-      await this.consumables.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_CONSUMABLE', reason, record.id);
-    }
-    await this.audit.record(user, 'CREATE_STOCK_IN', 'stockInRecord', { id: record.id, itemType: record.itemType });
-    return record;
+    return this.dataSource.transaction(async (em) => {
+      const record = await em.save(em.create(StockInRecord, payload));
+      const reason = `入库：采购单${record.purchaseOrderNo}，批号${record.batchNumber}`;
+      if (record.itemType === ItemType.Reagent) {
+        await this.reagents.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_REAGENT', reason, record.id, em);
+      } else {
+        await this.consumables.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_CONSUMABLE', reason, record.id, em);
+      }
+      await this.audit.record(user, 'CREATE_STOCK_IN', 'stockInRecord', { id: record.id, itemType: record.itemType });
+      return record;
+    });
   }
 }

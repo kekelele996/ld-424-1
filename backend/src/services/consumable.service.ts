@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Consumable } from '../models/consumable.entity';
 import { AuthUser } from '../types/interfaces';
 import { AuditService } from './audit.service';
@@ -28,17 +28,19 @@ export class ConsumableService {
     return consumable;
   }
 
-  async findOne(id: string) {
-    const consumable = await this.repo.findOneBy({ id });
+  async findOne(id: string, em?: EntityManager) {
+    const repo = em ? em.getRepository(Consumable) : this.repo;
+    const consumable = await repo.findOneBy({ id });
     if (!consumable) throw new NotFoundException('耗材不存在');
     return consumable;
   }
 
-  async adjustStock(id: string, delta: number, user: AuthUser, action = 'ADJUST_CONSUMABLE_STOCK', reason?: string, relatedRecordId?: string) {
-    const consumable = await this.findOne(id);
+  async adjustStock(id: string, delta: number, user: AuthUser, action = 'ADJUST_CONSUMABLE_STOCK', reason?: string, relatedRecordId?: string, em?: EntityManager) {
+    const repo = em ? em.getRepository(Consumable) : this.repo;
+    const consumable = await this.findOne(id, em);
     const beforeStock = Number(consumable.currentStock);
     consumable.currentStock = beforeStock + delta;
-    const saved = await this.repo.save(consumable);
+    const saved = await repo.save(consumable);
     await this.audit.record(user, action, 'consumable', { id, delta, currentStock: saved.currentStock });
     await this.alerts.cacheLowStockAlert(saved, 'consumable');
     const changeType = this.resolveChangeType(action);
@@ -52,7 +54,7 @@ export class ConsumableService {
       reason: reason ?? action,
       operatorId: user.id,
       relatedRecordId,
-    });
+    }, em);
     return saved;
   }
 

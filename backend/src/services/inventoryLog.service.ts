@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { InventoryLog } from '../models/inventoryLog.entity';
 import { InventoryChangeType, ItemType } from '../types/enums';
 
@@ -20,9 +20,10 @@ export class InventoryLogService {
     reason: string;
     operatorId?: string;
     relatedRecordId?: string;
-  }) {
-    return this.repo.save(
-      this.repo.create({
+  }, em?: EntityManager) {
+    const repo = em ? em.getRepository(InventoryLog) : this.repo;
+    return repo.save(
+      repo.create({
         itemId: params.itemId,
         itemType: params.itemType,
         changeType: params.changeType,

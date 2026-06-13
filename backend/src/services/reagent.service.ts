@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Reagent } from '../models/reagent.entity';
 import { AuthUser } from '../types/interfaces';
 import { AuditService } from './audit.service';
@@ -37,17 +37,19 @@ export class ReagentService {
     return reagent;
   }
 
-  async findOne(id: string) {
-    const reagent = await this.repo.findOneBy({ id });
+  async findOne(id: string, em?: EntityManager) {
+    const repo = em ? em.getRepository(Reagent) : this.repo;
+    const reagent = await repo.findOneBy({ id });
     if (!reagent) throw new NotFoundException('试剂不存在');
     return reagent;
   }
 
-  async adjustStock(id: string, delta: number, user: AuthUser, action = 'ADJUST_REAGENT_STOCK', reason?: string, relatedRecordId?: string) {
-    const reagent = await this.findOne(id);
+  async adjustStock(id: string, delta: number, user: AuthUser, action = 'ADJUST_REAGENT_STOCK', reason?: string, relatedRecordId?: string, em?: EntityManager) {
+    const repo = em ? em.getRepository(Reagent) : this.repo;
+    const reagent = await this.findOne(id, em);
     const beforeStock = Number(reagent.currentStock);
     reagent.currentStock = beforeStock + delta;
-    const saved = await this.repo.save(reagent);
+    const saved = await repo.save(reagent);
     await this.audit.record(user, action, 'reagent', { id, delta, currentStock: saved.currentStock });
     await this.alerts.cacheLowStockAlert(saved, 'reagent');
     const changeType = this.resolveChangeType(action);
@@ -61,7 +63,7 @@ export class ReagentService {
       reason: reason ?? action,
       operatorId: user.id,
       relatedRecordId,
-    });
+    }, em);
     return saved;
   }
 
