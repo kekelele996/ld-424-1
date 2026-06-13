@@ -23,10 +23,11 @@ export class StockInService {
 
   async create(payload: Partial<StockInRecord>, user: AuthUser) {
     const record = await this.repo.save(this.repo.create(payload));
+    const reason = `入库：采购单${record.purchaseOrderNo}，批号${record.batchNumber}`;
     if (record.itemType === ItemType.Reagent) {
-      await this.reagents.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_REAGENT');
+      await this.reagents.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_REAGENT', reason, record.id);
     } else {
-      await this.consumables.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_CONSUMABLE');
+      await this.consumables.adjustStock(record.itemId, Number(record.quantity), user, 'STOCK_IN_CONSUMABLE', reason, record.id);
     }
     await this.audit.record(user, 'CREATE_STOCK_IN', 'stockInRecord', { id: record.id, itemType: record.itemType });
     return record;

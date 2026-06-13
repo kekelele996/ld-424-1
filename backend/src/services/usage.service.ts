@@ -15,7 +15,7 @@ export class UsageService {
     private readonly reagents: ReagentService,
     private readonly consumables: ConsumableService,
     private readonly audit: AuditService,
-  ) {}
+  ) { }
 
   list() {
     return this.repo.find({ order: { usageDate: 'DESC' } });
@@ -33,12 +33,17 @@ export class UsageService {
       const reagent = await this.reagents.findOne(String(normalized.itemId));
       const dangerous = [HazardLevel.Toxic, HazardLevel.Explosive].includes(reagent.hazardLevel);
       if (dangerous && user.role === Role.Student) approvalStatus = UsageStatus.Pending;
-      if (approvalStatus === UsageStatus.Approved) await this.reagents.adjustStock(reagent.id, -Number(normalized.quantity), user, 'USE_REAGENT');
       if (dangerous) await this.audit.record(user, 'DANGEROUS_REAGENT_USAGE_REQUEST', 'usageRecord', { itemId: reagent.id, hazardLevel: reagent.hazardLevel });
-    } else {
-      if (approvalStatus === UsageStatus.Approved) await this.consumables.adjustStock(String(normalized.itemId), -Number(normalized.quantity), user, 'USE_CONSUMABLE');
     }
     const record = await this.repo.save(this.repo.create({ ...normalized, userId: normalized.userId ?? user.id, approvalStatus }));
+    if (approvalStatus === UsageStatus.Approved) {
+      const reason = `领用：${normalized.purpose}`;
+      if (normalized.itemType === ItemType.Reagent) {
+        await this.reagents.adjustStock(String(normalized.itemId), -Number(normalized.quantity), user, 'USE_REAGENT', reason, record.id);
+      } else {
+        await this.consumables.adjustStock(String(normalized.itemId), -Number(normalized.quantity), user, 'USE_CONSUMABLE', reason, record.id);
+      }
+    }
     await this.audit.record(user, 'CREATE_USAGE', 'usageRecord', { id: record.id, approvalStatus });
     return record;
   }
@@ -50,8 +55,9 @@ export class UsageService {
     record.approvalStatus = UsageStatus.Approved;
     record.approverId = user.id;
     const saved = await this.repo.save(record);
-    if (saved.itemType === ItemType.Reagent) await this.reagents.adjustStock(saved.itemId, -Number(saved.quantity), user, 'APPROVE_REAGENT_USAGE');
-    else await this.consumables.adjustStock(saved.itemId, -Number(saved.quantity), user, 'APPROVE_CONSUMABLE_USAGE');
+    const reason = `审批领用：${record.purpose}`;
+    if (saved.itemType === ItemType.Reagent) await this.reagents.adjustStock(saved.itemId, -Number(saved.quantity), user, 'APPROVE_REAGENT_USAGE', reason, saved.id);
+    else await this.consumables.adjustStock(saved.itemId, -Number(saved.quantity), user, 'APPROVE_CONSUMABLE_USAGE', reason, saved.id);
     await this.audit.record(user, 'APPROVE_USAGE', 'usageRecord', { id });
     return saved;
   }
